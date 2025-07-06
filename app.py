@@ -1,81 +1,49 @@
-import os
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect
 import openai
+import os
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")  # Needed for flash messages
 
-# In-memory data storage
-patients = []
-appointments = []
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Configure OpenAI API key
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-if OPENAI_API_KEY:
-    openai.api_key = OPENAI_API_KEY
-else:
-    print("Warning: OPENAI_API_KEY not set. AI summaries will not work.")
+pacientes = []
+citas = []
 
-def generate_clinical_summary(name, reason):
-    prompt = f"Paciente: {name}, Motivo: {reason}. Redacta un resumen clínico profesional y breve."
+def generar_resumen(nombre, motivo):
+    prompt = f"Paciente: {nombre}. Motivo de consulta: {motivo}. Redactá un resumen clínico profesional y breve."
     try:
-        if not openai.api_key:
-            raise ValueError("OpenAI API key not set")
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=80,
-            temperature=0.7,
+        respuesta = openai.Completion.create(
+            engine="text-davinci-003",
+            prompt=prompt,
+            max_tokens=100,
+            temperature=0.7
         )
-        summary = response.choices[0].message["content"].strip()
-        return summary
+        return respuesta.choices[0].text.strip()
     except Exception as e:
-        print(f"Error generating summary: {e}")
-        return "No se pudo generar el resumen clínico automáticamente."
+        return f"Error generando resumen: {e}"
 
-@app.route("/", methods=["GET", "POST"])
+@app.route("/")
 def index():
-    if request.method == "POST":
-        # Register patient
-        if "register_patient" in request.form:
-            name = request.form.get("name", "").strip()
-            reason = request.form.get("reason", "").strip()
-            if not name or not reason:
-                flash("Nombre y motivo de consulta son obligatorios.", "error")
-            else:
-                summary = generate_clinical_summary(name, reason)
-                patients.append({
-                    "name": name,
-                    "reason": reason,
-                    "summary": summary,
-                })
-                flash("Paciente registrado correctamente.", "success")
-            return redirect(url_for("index"))
+    return render_template("index.html", pacientes=pacientes, citas=citas)
 
-        # Schedule appointment
-        if "schedule_appointment" in request.form:
-            patient_name = request.form.get("patient_name", "").strip()
-            date = request.form.get("date", "")
-            time = request.form.get("time", "")
-            if not patient_name or not date or not time:
-                flash("Todos los campos para agendar cita son obligatorios.", "error")
-            else:
-                appointments.append({
-                    "patient_name": patient_name,
-                    "date": date,
-                    "time": time,
-                })
-                flash("Cita agendada correctamente.", "success")
-            return redirect(url_for("index"))
+@app.route("/agregar_paciente", methods=["POST"])
+def agregar_paciente():
+    nombre = request.form["nombre"]
+    email = request.form["email"]
+    telefono = request.form["telefono"]
+    motivo = request.form["motivo"]
+    resumen = generar_resumen(nombre, motivo)
+    pacientes.append({"nombre": nombre, "email": email, "telefono": telefono, "motivo": motivo, "resumen": resumen})
+    return redirect("/")
 
-    return render_template(
-        "index.html",
-        patients=patients,
-        appointments=appointments
-    )
+@app.route("/agendar_cita", methods=["POST"])
+def agendar_cita():
+    paciente = request.form["paciente"]
+    fecha = request.form["fecha"]
+    hora = request.form["hora"]
+    procedimiento = request.form["procedimiento"]
+    citas.append({"paciente": paciente, "fecha": fecha, "hora": hora, "procedimiento": procedimiento})
+    return redirect("/")
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
