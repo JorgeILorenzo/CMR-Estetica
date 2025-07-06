@@ -1,26 +1,34 @@
 from flask import Flask, render_template, request, redirect
-import openai
 import os
 
 app = Flask(__name__)
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai_key = os.getenv("OPENAI_API_KEY")
+
+if openai_key:
+    import openai
+    openai.api_key = openai_key
+else:
+    openai = None
 
 pacientes = []
 citas = []
 
 def generar_resumen(nombre, motivo):
-    prompt = f"Paciente: {nombre}. Motivo de consulta: {motivo}. Redactá un resumen clínico profesional y breve."
-    try:
-        respuesta = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=prompt,
-            max_tokens=100,
-            temperature=0.7
-        )
-        return respuesta.choices[0].text.strip()
-    except Exception as e:
-        return f"Error generando resumen: {e}"
+    if openai:
+        prompt = f"Paciente: {nombre}. Motivo de consulta: {motivo}. Redactá un resumen clínico profesional y breve."
+        try:
+            respuesta = openai.Completion.create(
+                engine="text-davinci-003",
+                prompt=prompt,
+                max_tokens=100,
+                temperature=0.7
+            )
+            return respuesta.choices[0].text.strip()
+        except Exception as e:
+            return f"Error generando resumen: {e}"
+    else:
+        return "Resumen no disponible (IA desactivada)"
 
 @app.route("/")
 def index():
