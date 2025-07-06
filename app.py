@@ -1,47 +1,80 @@
-from flask import Flask, render_template, request, redirect
-import openai
 import os
+from flask import Flask, render_template, request, redirect, url_for, flash
+import openai
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")  # Needed for flash messages
 
-# Configuración de la API Key de OpenAI
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# In-memory data storage
+patients = []
+appointments = []
 
-# Datos simulados
-pacientes = []
-citas = []
+# Configure OpenAI API key
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+if OPENAI_API_KEY:
+    openai.api_key = OPENAI_API_KEY
+else:
+    print("Warning: OPENAI_API_KEY not set. AI summaries will not work.")
 
-def generar_resumen_clinico(nombre, motivo):
+def generate_clinical_summary(name, reason):
+    prompt = f"Paciente: {name}, Motivo: {reason}. Redacta un resumen clínico profesional y breve."
     try:
-        prompt = f"Paciente: {nombre}\nMotivo de consulta: {motivo}\nGenera un breve resumen clínico profesional:"
-        respuesta = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=prompt,
-            max_tokens=100
+        if not openai.api_key:
+            raise ValueError("OpenAI API key not set")
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=80,
+            temperature=0.7,
         )
-        return respuesta.choices[0].text.strip()
+        summary = response.choices[0].message["content"].strip()
+        return summary
     except Exception as e:
-        return f"Error al generar resumen: {e}"
+        print(f"Error generating summary: {e}")
+        return "No se pudo generar el resumen clínico automáticamente."
 
-@app.route("/")
+@app.route("/", methods=["GET", "POST"])
 def index():
-    return render_template("index.html", pacientes=pacientes, citas=citas)
+    if request.method == "POST":
+        # Register patient
+        if "register_patient" in request.form:
+            name = request.form.get("name", "").strip()
+            reason = request.form.get("reason", "").strip()
+            if not name or not reason:
+                flash("Nombre y motivo de consulta son obligatorios.", "error")
+            else:
+                summary = generate_clinical_summary(name, reason)
+                patients.append({
+                    "name": name,
+                    "reason": reason,
+                    "summary": summary,
+                })
+                flash("Paciente registrado correctamente.", "success")
+            return redirect(url_for("index"))
 
-@app.route("/agregar_paciente", methods=["POST"])
-def agregar_paciente():
-    nombre = request.form["nombre"]
-    motivo = request.form["motivo"]
-    resumen = generar_resumen_clinico(nombre, motivo)
-    pacientes.append({"nombre": nombre, "motivo": motivo, "resumen": resumen})
-    return redirect("/")
+        # Schedule appointment
+        if "schedule_appointment" in request.form:
+            patient_name = request.form.get("patient_name", "").strip()
+            date = request.form.get("date", "")
+            time = request.form.get("time", "")
+            if not patient_name or not date or not time:
+                flash("Todos los campos para agendar cita son obligatorios.", "error")
+            else:
+                appointments.append({
+                    "patient_name": patient_name,
+                    "date": date,
+                    "time": time,
+                })
+                flash("Cita agendada correctamente.", "success")
+            return redirect(url_for("index"))
 
-@app.route("/agendar_cita", methods=["POST"])
-def agendar_cita():
-    nombre = request.form["nombre_cita"]
-    fecha = request.form["fecha"]
-    hora = request.form["hora"]
-    citas.append({"nombre": nombre, "fecha": fecha, "hora": hora})
-    return redirect("/")
+    return render_template(
+        "index.html",
+        patients=patients,
+        appointments=appointments
+    )
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

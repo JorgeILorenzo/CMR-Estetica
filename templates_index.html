@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>CRM Consultorio Médico Estético</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; background: #f9f9f9; }
+        h2 { border-bottom: 2px solid #ccc; padding-bottom: 5px; }
+        section { background: #fff; padding: 16px; margin-bottom: 24px; border-radius: 6px; box-shadow: 0 1px 3px #ddd; }
+        form > div { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 4px; }
+        input, textarea, select { width: 100%; padding: 6px; }
+        .messages { margin-bottom: 16px; }
+        .success { color: green; }
+        .error { color: #b30000; }
+        ul { padding-left: 1.2em; }
+        li { margin-bottom: 7px; }
+        .summary { background: #f0f0f7; padding: 8px; border-radius: 4px; font-size: 0.95em; }
+    </style>
+</head>
+<body>
+    <h1>CRM Consultorio Médico Estético</h1>
+
+    <div class="messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="{{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+    </div>
+
+    <section>
+        <h2>Registrar Paciente</h2>
+        <form method="post">
+            <div>
+                <label for="name">Nombre del paciente:</label>
+                <input type="text" name="name" id="name" required>
+            </div>
+            <div>
+                <label for="reason">Motivo de consulta:</label>
+                <textarea name="reason" id="reason" rows="2" required></textarea>
+            </div>
+            <button type="submit" name="register_patient">Registrar</button>
+        </form>
+    </section>
+
+    <section>
+        <h2>Agendar Cita</h2>
+        <form method="post">
+            <div>
+                <label for="patient_name">Paciente:</label>
+                <select name="patient_name" id="patient_name" required>
+                    <option value="">Seleccione un paciente</option>
+                    {% for patient in patients %}
+                        <option value="{{ patient.name }}">{{ patient.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="date">Fecha:</label>
+                <input type="date" name="date" id="date" required>
+            </div>
+            <div>
+                <label for="time">Hora:</label>
+                <input type="time" name="time" id="time" required>
+            </div>
+            <button type="submit" name="schedule_appointment">Agendar</button>
+        </form>
+    </section>
+
+    <section>
+        <h2>Pacientes Registrados</h2>
+        {% if patients %}
+            <ul>
+                {% for p in patients %}
+                    <li>
+                        <strong>{{ p.name }}</strong> - <em>{{ p.reason }}</em><br>
+                        <div class="summary">
+                            <strong>Resumen clínico:</strong> {{ p.summary }}
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No hay pacientes registrados.</p>
+        {% endif %}
+    </section>
+
+    <section>
+        <h2>Citas Agendadas</h2>
+        {% if appointments %}
+            <ul>
+                {% for a in appointments %}
+                    <li>
+                        <strong>{{ a.patient_name }}</strong>: {{ a.date }} a las {{ a.time }}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No hay citas agendadas.</p>
+        {% endif %}
+    </section>
+</body>
+</html>
